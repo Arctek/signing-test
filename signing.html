@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>var windowLoaded=new Promise(function(resolve,reject){window.addEventListener("load",function(){resolve()})})</script>
+</head>
+<body>
+<style type="text/css">
+body {
+    font-family: Arial;
+}
+
+#web3-properties {
+    border: 1px solid #000;
+    padding: 12px;
+    background: #f2f2f2;
+    margin-bottom: 22px;
+    display: none;
+}
+
+button {
+    background: transparent;
+    font-family: 'Arial';
+    font-size: 16px;
+    font-weight: bold;
+    background: #efefef;
+    border:1px solid #000;
+    cursor: pointer;
+    padding: 10px 12px;
+    border-radius: 4px;
+}
+
+.test {
+    margin-bottom: 22px;
+}
+
+.invalid {
+    margin-top: 12px;
+    color: red;
+}
+
+.valid {
+    margin-top: 12px;
+    color: green;
+}
+
+</style>
+<h1>0x Order Signing</h1>
+<div id="web3-properties">Not Loaded</div>
+<div class="test">
+<button id="eth_signedTypeData">eth_signedTypeData</button>
+<div id="eth_signedTypeData_results"></div>
+</div>
+
+<div class="test">
+<button id="eth_signedTypeData_v3">eth_signedTypeData_v3</button>
+<div id="eth_signedTypeData_v3_results"></div>
+</div>
+
+<div class="test">
+<button id="eth_signedTypeData_draft">eth_signedTypeData old draft</button>
+<div id="eth_signedTypeData_draft_results"></div>
+</div>
+
+<div class="test">
+<button id="personal_sign">personal_sign</button>
+<div id="personal_sign_results"></div>
+</div>
+
+<div class="test">
+<button id="eth_sign_no_prefix">eth_sign no prefix</button>
+<div id="eth_sign_no_prefix_results"></div>
+</div>
+
+<div class="test">
+<button id="eth_sign_with_prefix">eth_sign with prefix</button>
+<div id="eth_sign_with_prefix_results"></div>
+</div>
+<script src="lib.js"></script>
+<script>
+window.onerror = function(err) {
+    //alert(err);
+}
+
+let testOrder = {
+    makerAddress: "",
+    takerAddress: "0x0000000000000000000000000000000000000000",
+    feeRecipientAddress: "0x0000000000000000000000000000000000000001",
+    senderAddress: "0x0000000000000000000000000000000000000000",
+    makerAssetAmount: "1",
+    takerAssetAmount: "1",
+    makerFee: "0",
+    takerFee: "0",
+    expirationTimeSeconds: "1668613495",
+    salt: "1234",
+    makerAssetData: "0xf47261b000000000000000000000000065be44c747988fbf606207698c944df4442efe10",
+    takerAssetData: "0xf47261b000000000000000000000000065be44c747988fbf606207698c944df4442efe13",
+    exchangeAddress: "0x0000000000000000000000000000000000000001"
+};
+
+setTimeout(function() {
+    windowLoaded.then(function() {
+        let web3Proxy;
+
+        if ("ethereum" in window) {
+            web3Proxy = window.ethereum;
+        }
+        else if ("web3" in window) {
+            web3Proxy = window.web3;    
+        }
+
+        if (web3Proxy) {
+            let result = '';
+
+            Object.keys(web3Proxy).forEach(function(key) {
+                try {
+                    result += "<strong>" + key + ": </strong>" + web3Proxy[key] + "<br />";
+
+                    if (key === "_metamask") {
+                        Object.keys(web3Proxy._metamask).forEach(function(key2) {
+                            try {
+                                result += "<strong>_metamask." + key2 + ": </strong>" + web3Proxy._metamask[key2] + "<br />";
+                            } catch (err) {}
+                        });
+                    }
+
+                    if (key === "eth") {
+                        Object.keys(web3Proxy.eth).forEach(function(key2) {
+                            try {
+                                result += "<strong>eth." + key2 + ": </strong>" + web3Proxy.eth[key2] + "<br />";
+                            } catch (err) {}
+                        });
+                    }
+                } catch (err) {
+
+                }
+            });
+
+            document.getElementById("web3-properties").innerHTML = result;
+
+            let readyChain = Promise.resolve(true);
+
+            if ("enable" in web3Proxy) {
+                readyChain = web3Proxy.enable();
+            }
+            else if ("currentProvider" in web3Proxy) {
+                web3Proxy = window.web3.currentProvider;
+            }
+
+            readyChain.then(function() {
+                document.getElementById("eth_signedTypeData").addEventListener("click", function() {
+                    var provider = new Web3ProviderEngine({ pollingInterval: 200000 });
+                    provider.addProvider(new PassthroughSubprovider(web3Proxy));
+                    provider._ready.go();
+
+                    var myWeb3 = new MyWeb3Library(provider);
+
+                    myWeb3.eth.getAccounts().then(function(accounts) {
+                        var signerAddress = accounts[0];
+
+                        testOrder.makerAddress = signerAddress;
+
+                        return signatureUtils.ecSignTypedDataOrderAsync(provider, testOrder, testOrder.makerAddress);
+                    })
+                    .then(function(signature) {
+                        document.getElementById("eth_signedTypeData_results").innerHTML = '<div class="action-results valid">Valid signature produced.</div>';
+                    })
+                    .catch(function(error) {
+                        console.log(error);
+                        document.getElementById("eth_signedTypeData_results").innerHTML = '<div class="action-results invalid">Invalid signature produced: ' + error.toString() + '</div>';
+                    });
+                });
+
+                document.getElementById("eth_signedTypeData_v3").addEventListener("click", function() {
+                    var provider = new Web3ProviderEngine({ pollingInterval: 200000 });
+                    provider.addProvider(new MetamaskSubprovider(web3Proxy));
+                    provider._ready.go();
+
+                    var myWeb3 = new MyWeb3Library(provider);
+
+                    myWeb3.eth.getAccounts().then(function(accounts) {
+                        var signerAddress = accounts[0];
+
+                        testOrder.makerAddress = signerAddress;
+
+                        return signatureUtils.ecSignTypedDataOrderAsync(provider, testOrder, testOrder.makerAddress);
+                    })
+                    .then(function(signature) {
+                        document.getElementById("eth_signedTypeData_v3_results").innerHTML = '<div class="action-results valid">Valid signature produced.</div>';
+                    })
+                    .catch(function(error) {
+                        console.log(error);
+                        document.getElementById("eth_signedTypeData_v3_results").innerHTML = '<div class="action-results invalid">Invalid signature produced: ' + error.toString() + '</div>';
+                    });
+                });
+
+                document.getElementById("eth_signedTypeData_draft").addEventListener("click", function() {
+                    var provider = new Web3ProviderEngine({ pollingInterval: 200000 });
+                    provider.addProvider(new DraftSubprovider(web3Proxy));
+                    provider.addProvider(new PassthroughSubprovider(web3Proxy));
+                    provider._ready.go();
+
+                    var myWeb3 = new MyWeb3Library(provider);
+
+                    myWeb3.eth.getAccounts().then(function(accounts) {
+                        var signerAddress = accounts[0];
+
+                        testOrder.makerAddress = signerAddress;
+
+                        return signatureUtils.ecSignTypedDataOrderAsync(provider, testOrder, testOrder.makerAddress);
+                    })
+                    .then(function(signature) {
+                        document.getElementById("eth_signedTypeData_draft_results").innerHTML = '<div class="action-results valid">Valid signature produced.</div>';
+                    })
+                    .catch(function(error) {
+                        console.log(error);
+                        document.getElementById("eth_signedTypeData_draft_results").innerHTML = '<div class="action-results invalid">Invalid signature produced: ' + error.toString() + '</div>';
+                    });
+                });
+
+                document.getElementById("personal_sign").addEventListener("click", function() {
+                    var provider = new Web3ProviderEngine({ pollingInterval: 200000 });
+                    provider.addProvider(new PersonalSignSubprovider(web3Proxy));
+                    provider.addProvider(new PassthroughSubprovider(web3Proxy));
+                    provider._ready.go();
+
+                    var myWeb3 = new MyWeb3Library(provider);
+
+                    myWeb3.eth.getAccounts().then(function(accounts) {
+                        var signerAddress = accounts[0];
+
+                        testOrder.makerAddress = signerAddress;
+
+                        var orderHash = orderHashUtils.getOrderHashHex(testOrder);
+
+                        return signatureUtils.ecSignHashAsync(provider, orderHash, testOrder.makerAddress);
+                    })
+                    .then(function(signature) {
+                        document.getElementById("personal_sign_results").innerHTML = '<div class="action-results valid">Valid signature produced.</div>';
+                    })
+                    .catch(function(error) {
+                        console.log(error);
+                        document.getElementById("personal_sign_results").innerHTML = '<div class="action-results invalid">Invalid signature produced: ' + error.toString() + '</div>';
+                    });
+                });
+
+                document.getElementById("eth_sign_no_prefix").addEventListener("click", function() {
+                    var provider = new Web3ProviderEngine({ pollingInterval: 200000 });
+                    provider.addProvider(new PassthroughSubprovider(web3Proxy));
+                    provider._ready.go();
+
+                    var myWeb3 = new MyWeb3Library(provider);
+
+                    myWeb3.eth.getAccounts().then(function(accounts) {
+                        var signerAddress = accounts[0];
+
+                        testOrder.makerAddress = signerAddress;
+
+                        var orderHash = orderHashUtils.getOrderHashHex(testOrder);
+
+                        return signatureUtils.ecSignHashAsync(provider, orderHash, testOrder.makerAddress);
+                    })
+                    .then(function(signature) {
+                        document.getElementById("eth_sign_no_prefix_results").innerHTML = '<div class="action-results valid">Valid signature produced.</div>';
+                    })
+                    .catch(function(error) {
+                        console.log(error);
+                        document.getElementById("eth_sign_no_prefix_results").innerHTML = '<div class="action-results invalid">Invalid signature produced: ' + error.toString() + '</div>';
+                    });
+                });
+
+                document.getElementById("eth_sign_with_prefix").addEventListener("click", function() {
+                    var provider = new Web3ProviderEngine({ pollingInterval: 200000 });
+                    provider.addProvider(new EthSignAddPrefixSubprovider(web3Proxy));
+                    provider.addProvider(new PassthroughSubprovider(web3Proxy));
+                    provider._ready.go();
+
+                    var myWeb3 = new MyWeb3Library(provider);
+
+                    myWeb3.eth.getAccounts().then(function(accounts) {
+                        var signerAddress = accounts[0];
+
+                        testOrder.makerAddress = signerAddress;
+
+                        var orderHash = orderHashUtils.getOrderHashHex(testOrder);
+
+                        return signatureUtils.ecSignHashAsync(provider, orderHash, testOrder.makerAddress);
+                    })
+                    .then(function(signature) {
+                        document.getElementById("eth_sign_with_prefix_results").innerHTML = '<div class="action-results valid">Valid signature produced.</div>';
+                    })
+                    .catch(function(error) {
+                        console.log(error);
+                        document.getElementById("eth_sign_with_prefix_results").innerHTML = '<div class="action-results invalid">Invalid signature produced: ' + error.toString() + '</div>';
+                    });
+                });
+            });
+
+            
+        }
+    });
+}, 1000);
+</script>
+</body>
+</html>
